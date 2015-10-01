@@ -1,6 +1,8 @@
 var fs = require( 'fs' ),
     async = require( 'async' );
 
+const concurrentUploads = 2;
+
 function DRFS() {
   console.log( 'DRFS()' );
   this.hosts = [];
@@ -23,8 +25,8 @@ DRFS.prototype.addHosts = function( hosts ) {
 DRFS.prototype.splitFile = function(fname, callback) {
 
   var stream = fs.createReadStream( fname ),
-//      fragmentMaxSize = 25000000,
-      fragmentMaxSize = 1000000,
+      fragmentMaxSize = 2500000,
+//      fragmentMaxSize = 1000000,
       fragmentSize = 0,
       fragmentIndex = 0,
       fragments = {};
@@ -71,11 +73,23 @@ DRFS.prototype.splitFile = function(fname, callback) {
 };
 
 DRFS.prototype.put = function( fname, callback ) {
-  console.log( '-> put', fname );
-  var self = this;
+
+  var self = this,
+      fragments = [],
+      uploadQueue = async.queue( function( file, callback ) {
+        console.log( 'upload!', file );
+        setTimeout( function() { callback() }, 5000 );
+      }, concurrentUploads );
+
+  uploadQueue.drain = function() {
+    console.log( 'opa!', fragments );
+  };
+
   self.splitFile( fname, function( files ) {
     files.forEach( function( file ) {
-      self.uploadFragment(file);
+      uploadQueue.push( file, function() {
+        fragments.push( file );
+      });
     });
   });
 };
