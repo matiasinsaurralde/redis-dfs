@@ -4,6 +4,6 @@ var DRFS = require( './' ),
 
 drfs.addHosts( [ 'x.x.x.x', 'x.x.x.x' ] );
 
-drfs.put( 'american_woman.mp3', function( files ) {
+drfs.put( 'JoeWilliams-StackODollars.mp3', function( files ) {
   console.log( '-> put ok!', files );
 } );
