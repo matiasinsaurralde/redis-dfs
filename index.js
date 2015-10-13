@@ -76,6 +76,14 @@ function DRFS() {
 
   this.uploadChunk = function( file, id, dest ) {
 
+    /*
+      currently the program matches the chunk id
+      with the host id (so the sample code works :p).
+      after splitting the file in chunks
+      we SET each chunk as a diferent key,
+      on a different host, chunk #1 => host #1, and so on.
+    */
+
     var host = this.hosts[ this.uploadIndex ].split( ':' ),
         redis = Redis.createClient( host[1], host[0] ),
         keyName = [ file, id ].join( ':' );
@@ -90,6 +98,18 @@ function DRFS() {
     });
 
     this.uploadIndex++;
+  };
+
+  /*
+    this strategy is more generic, we iterate through
+    all available keys and we focus on keys that match
+    the requested file name, the key name consists of
+    the original file name & the chunk id, allowing us
+    to reconstruct the data.
+  */
+
+  this.get = function( file, callback ) {
+    console.log( '-> Get', file );
   };
 };
 
