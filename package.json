@@ -11,6 +11,6 @@
   "dependencies": {
     "async": "^1.4.2",
     "chunking-streams": "0.0.8",
-    "redis": "^2.0.1"
+    "redis": "^2.2.1"
   }
 }
