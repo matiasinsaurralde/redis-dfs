@@ -57,7 +57,7 @@ function DRFS() {
     });
 
     chunker.on('chunkEnd', function(id, done) {
-      self.uploadChunk( dest );
+      self.uploadChunk( file, id, dest );
       output.end();
       done();
     });
@@ -74,16 +74,17 @@ function DRFS() {
 
   };
 
-  this.uploadChunk = function(file) {
-    // var redis = Redis.createClient();
+  this.uploadChunk = function( file, id, dest ) {
+
     var host = this.hosts[ this.uploadIndex ].split( ':' ),
-        redis = Redis.createClient( host[1], host[0] );
+        redis = Redis.createClient( host[1], host[0] ),
+        keyName = [ file, id ].join( ':' );
 
     console.log( '=> Using host', host[0], 'for', file );
 
     fs.readFile( file, function( err, data ) {
       console.log( 'redis.set', data );
-      redis.set( file, data, function( err, reply ) {
+      redis.set( keyName, data, function( err, reply ) {
         console.log( 'upload ok?', err, reply );
       });
     });
