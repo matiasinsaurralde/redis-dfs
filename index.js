@@ -24,6 +24,8 @@ function DRFS() {
 
   this.hosts = [];
 
+  this.uploadIndex = 0;
+
   this.addHost = function(host) {
     console.log('+host', host);
     this.hosts.push( host );
@@ -39,7 +41,7 @@ function DRFS() {
   this.put = function(file, callback) {
 
     var self = this,
-        readableStream = fs.createReadStream(file),
+        readableStream = fs.createReadStream( file ),
         chunker = new SizeChunker({
           chunkSize: defaultChunkSize,
           flushTail: true
@@ -55,7 +57,7 @@ function DRFS() {
     });
 
     chunker.on('chunkEnd', function(id, done) {
-      self.uploadChunk( id );
+      self.uploadChunk( dest );
       output.end();
       done();
     });
@@ -71,9 +73,22 @@ function DRFS() {
     readableStream.pipe(gzip).pipe(chunker);
 
   };
+
   this.uploadChunk = function(file) {
-    console.log('-> Uploading chunk', file);
-    var redis = Redis.createClient();
+    // var redis = Redis.createClient();
+    var host = this.hosts[ this.uploadIndex ].split( ':' ),
+        redis = Redis.createClient( host[1], host[0] );
+
+    console.log( '=> Using host', host[0], 'for', file );
+
+    fs.readFile( file, function( err, data ) {
+      console.log( 'redis.set', data );
+      redis.set( file, data, function( err, reply ) {
+        console.log( 'upload ok?', err, reply );
+      });
+    });
+
+    this.uploadIndex++;
   };
 };
 
