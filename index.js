@@ -1,18 +1,21 @@
 var fs = require('fs'),
   zlib = require('zlib');
-  gzip = zlib.createGzip();
-  chunkingStreams = require('chunking-streams');
+  gzip = zlib.createGzip(),
+  chunkingStreams = require('chunking-streams'),
+  path = require( 'path' );
 
-const concurrentUploads = 2;
+const concurrentUploads = 2,
+      tmpDir = '/tmp/redis-dfs',
+      defaultChunkSize = 800000;
+
+if( !fs.existsSync( tmpDir ) ) {
+  console.log( '=> Creating tmp dir', tmpDir );
+  fs.mkdirSync( tmpDir );
+};
 
 var LineCounter = chunkingStreams.LineCounter,
     SeparatorChunker = chunkingStreams.SeparatorChunker,
     SizeChunker = chunkingStreams.SizeChunker;
-
-new SizeChunker({
-  chunkSize: 1024, // must be a number greater than zero.
-  flushTail: false // flush or not remainder of an incoming stream. Defaults to false
-});
 
 function DRFS() {
   console.log('DRFS()');
@@ -21,22 +24,27 @@ function DRFS() {
   this.addHost = function(host) {
     console.log('+host', host);
   };
+
   this.addHosts = function(hosts) {
     var self = this;
     hosts.forEach(function(e) {
       self.addHost(e);
     });
   };
+
   this.put = function(file, callback) {
+
     var readableStream = fs.createReadStream(file),
-    chunker = new SizeChunker({
-      chunkSize: 1024
-    }),
-    output;
+        chunker = new SizeChunker({
+          chunkSize: defaultChunkSize,
+          flushTail: true
+        }),
+        output;
 
     chunker.on('chunkStart', function(id, done) {
-      console.log(id);
-      output = fs.createWriteStream(id + '.gz');
+      console.log( '-> Writing chunk', id );
+      var dest = path.join( tmpDir, id + '.gz' );
+      output = fs.createWriteStream( dest );
       done();
     });
 
@@ -44,8 +52,13 @@ function DRFS() {
       output.end();
       done();
     });
+
     chunker.on('data', function(chunk) {
       output.write(chunk.data);
+    });
+
+    chunker.on( 'end', function() {
+      console.log( '-> Chunker ends' );
     });
 
     readableStream.pipe(gzip).pipe(chunker);
@@ -55,8 +68,6 @@ function DRFS() {
     console.log('-> upload', file);
   };
 };
-
-
 
 
 module.exports = DRFS;
