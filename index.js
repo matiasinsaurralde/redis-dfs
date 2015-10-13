@@ -1,8 +1,9 @@
-var fs = require('fs'),
-  zlib = require('zlib');
-  gzip = zlib.createGzip(),
-  chunkingStreams = require('chunking-streams'),
-  path = require( 'path' );
+var fs = require( 'fs' ),
+    Redis = require( 'redis' ),
+    zlib = require( 'zlib' );
+    gzip = zlib.createGzip(),
+    chunkingStreams = require( 'chunking-streams' ),
+    path = require( 'path' );
 
 const concurrentUploads = 2,
       tmpDir = '/tmp/redis-dfs',
@@ -18,11 +19,14 @@ var LineCounter = chunkingStreams.LineCounter,
     SizeChunker = chunkingStreams.SizeChunker;
 
 function DRFS() {
+
   console.log('DRFS()');
+
   this.hosts = [];
 
   this.addHost = function(host) {
     console.log('+host', host);
+    this.hosts.push( host );
   };
 
   this.addHosts = function(hosts) {
@@ -34,21 +38,24 @@ function DRFS() {
 
   this.put = function(file, callback) {
 
-    var readableStream = fs.createReadStream(file),
+    var self = this,
+        readableStream = fs.createReadStream(file),
         chunker = new SizeChunker({
           chunkSize: defaultChunkSize,
           flushTail: true
         }),
+        dest,
         output;
 
     chunker.on('chunkStart', function(id, done) {
       console.log( '-> Writing chunk', id );
-      var dest = path.join( tmpDir, id + '.gz' );
+      dest = path.join( tmpDir, id + '.gz' );
       output = fs.createWriteStream( dest );
       done();
     });
 
     chunker.on('chunkEnd', function(id, done) {
+      self.uploadChunk( id );
       output.end();
       done();
     });
@@ -64,8 +71,9 @@ function DRFS() {
     readableStream.pipe(gzip).pipe(chunker);
 
   };
-  this.uploadFragment = function(file) {
-    console.log('-> upload', file);
+  this.uploadChunk = function(file) {
+    console.log('-> Uploading chunk', file);
+    var redis = Redis.createClient();
   };
 };
 
