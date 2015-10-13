@@ -1,4 +1,5 @@
 var fs = require( 'fs' ),
+    async = require( 'async' ),
     Redis = require( 'redis' ),
     zlib = require( 'zlib' );
     gzip = zlib.createGzip(),
@@ -85,15 +86,17 @@ function DRFS() {
     */
 
     var host = this.hosts[ this.uploadIndex ].split( ':' ),
-        redis = Redis.createClient( host[1], host[0] ),
+        redis = Redis.createClient( host[1], host[0], { return_buffers: true } ),
         keyName = [ file, id ].join( ':' );
 
     console.log( '=> Using host', host[0], 'for', file );
 
-    fs.readFile( file, function( err, data ) {
+    fs.readFile( dest, function( err, data ) {
       console.log( 'redis.set', data );
       redis.set( keyName, data, function( err, reply ) {
         console.log( 'upload ok?', err, reply );
+
+        fs.unlink( dest );
       });
     });
 
@@ -110,7 +113,52 @@ function DRFS() {
 
   this.get = function( file, callback ) {
     console.log( '-> Get', file );
+
+    var matchingKeys = {},
+        chunks = [];
+
+    async.each( this.hosts, function( host, callback ) {
+      var host = host.split( ':' ),
+          redis = Redis.createClient( host[1], host[0], { return_buffers: true } );
+
+      redis.keys( file + '*', function( err, keys ) {
+        if( keys.length > 0 ) {
+          matchingKeys[ host.join( ':' ) ] = keys;
+        };
+
+        async.each( keys, function( key, callback ) {
+          var keyName = key.toString()
+          redis.get( keyName, function( err, data ) {
+            var dest = path.join( tmpDir, keyName ),
+                chunk = fs.createWriteStream( dest );
+
+            chunk.write( data );
+            chunk.end();
+
+            chunks.push( dest );
+
+            callback();
+          });
+        }, function( err ) {
+          callback();
+        });
+      });
+
+    }, function( err ) {
+
+      console.log( '-> Got these chunks', chunks );
+
+      chunks = chunks.sort( function( a, b ) {
+        var a = a.split( ':' )[1],
+            b = b.split( ':' )[1];
+           return a - b;
+      });
+
+      console.log( chunks );
+    });
+
   };
+
 };
 
 
