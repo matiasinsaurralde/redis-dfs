@@ -3,6 +3,7 @@ var fs = require( 'fs' ),
     Redis = require( 'redis' ),
     zlib = require( 'zlib' );
     gzip = zlib.createGzip(),
+    gunzip = zlib.createGunzip(),
     chunkingStreams = require( 'chunking-streams' ),
     path = require( 'path' );
 
@@ -111,8 +112,8 @@ function DRFS() {
     to reconstruct the data.
   */
 
-  this.get = function( file, callback ) {
-    console.log( '-> Get', file );
+  this.get = function( filename, callback ) {
+    console.log( '-> Get', filename );
 
     var matchingKeys = {},
         chunks = [];
@@ -121,7 +122,7 @@ function DRFS() {
       var host = host.split( ':' ),
           redis = Redis.createClient( host[1], host[0], { return_buffers: true } );
 
-      redis.keys( file + '*', function( err, keys ) {
+      redis.keys( filename + '*', function( err, keys ) {
         if( keys.length > 0 ) {
           matchingKeys[ host.join( ':' ) ] = keys;
         };
@@ -148,13 +149,27 @@ function DRFS() {
 
       console.log( '-> Got these chunks', chunks );
 
+      var dest = 'download_' + filename,
+          file = fs.createWriteStream( dest + '.gz' );
+
       chunks = chunks.sort( function( a, b ) {
         var a = a.split( ':' )[1],
             b = b.split( ':' )[1];
-           return a - b;
+        return a - b;
       });
 
-      console.log( chunks );
+      async.eachSeries( chunks, function( chunk, callback ) {
+        fs.readFile( chunk, function( err, data ) {
+          file.write( data );
+          callback();
+        });
+      }, function() {
+        file.end();
+        file = fs.createReadStream( dest + '.gz' );
+        file.pipe( gunzip ).pipe( fs.createWriteStream( dest ) );
+        // fs.unlink( dest + '.gz' );
+        console.log( '-> Reconstructed file!', dest );
+      });
     });
 
   };
