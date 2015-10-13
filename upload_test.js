@@ -9,4 +9,4 @@ drfs.addHosts( hosts );
 
 drfs.put( 'JoeWilliams-StackODollars.mp3', function( files ) {
   console.log( '-> put ok!', files );
-} );
+});
